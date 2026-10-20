@@ -15,6 +15,15 @@ use crate::storage;
 /// two was explicitly avoided per `DECISIONS.md`'s schema-guard discussion.
 pub const CONTRACT_VERSION: u32 = 1;
 
+/// Soroban caps a `#[contracterror]` enum at 50 cases.
+///
+/// `ContractError` (see `src/types.rs`) is consolidated to fit this ceiling; the
+/// full "~61 conceptual errors -> <=50 variants" mapping and every merge
+/// decision live in the doc-comment atop the enum and in `DECISIONS.md`'s
+/// "Error-code budget" section. This constant is the single source of truth for
+/// the cap so the compile-time assertion below and any future tooling agree.
+pub const MAX_CONTRACT_ERROR_VARIANTS: usize = 50;
+
 pub struct Contract;
 
 #[contractimpl]
@@ -41,3 +50,13 @@ impl Contract {
         storage::get_admin(&env).is_some() && storage::get_relay_signer(&env).is_some()
     }
 }
+
+/// Compile-time guard that `ContractError` stays within Soroban's 50-variant cap.
+///
+/// `ContractError::__VARIANT_COUNT` is a `const` emitted alongside the enum in
+/// `src/types.rs`; if a future PR adds a variant past the ceiling this module
+/// fails to compile, so the cap cannot silently regress.
+const _: () = assert!(
+    crate::types::ContractError::__VARIANT_COUNT <= MAX_CONTRACT_ERROR_VARIANTS,
+    "ContractError exceeds Soroban's 50-variant cap; see DECISIONS.md 'Error-code budget'"
+);
